@@ -12,6 +12,21 @@ import { SettingGroup, SettingGroupLabel, SettingRow } from "./SettingRow";
 const FILTER_FIELDS: FeedFilterRule["field"][] = ["TITLE", "SUMMARY", "AUTHOR"];
 const FILTER_ACTIONS: FeedFilterRule["action"][] = ["DENY", "ALLOW"];
 
+const HOME_FEED_PRESETS = [
+  { value: "https://rss.arxiv.org/rss/cs.LG", label: "arXiv · Machine Learning (cs.LG)" },
+  { value: "https://rss.arxiv.org/rss/quant-ph", label: "arXiv · Quantum Physics (quant-ph)" },
+  { value: "https://rss.arxiv.org/rss/hep-th", label: "arXiv · High Energy Physics - Theory (hep-th)" },
+  { value: "https://feeds.aps.org/rss/recent/prl.xml", label: "APS · Physical Review Letters (PRL)" },
+  { value: "https://feeds.aps.org/rss/recent/pra.xml", label: "APS · Physical Review A (PRA)" },
+  { value: "https://feeds.aps.org/rss/recent/prb.xml", label: "APS · Physical Review B (PRB)" },
+  { value: "https://feeds.aps.org/rss/recent/prd.xml", label: "APS · Physical Review D (PRD)" },
+  { value: "https://feeds.aps.org/rss/recent/pre.xml", label: "APS · Physical Review E (PRE)" },
+  { value: "https://feeds.aps.org/rss/recent/prx.xml", label: "APS · Physical Review X (PRX)" },
+  { value: "https://feeds.aps.org/rss/recent/prxquantum.xml", label: "APS · PRX Quantum" },
+  { value: "https://feeds.aps.org/rss/recent/rmp.xml", label: "APS · Reviews of Modern Physics (RMP)" },
+  { value: "https://feeds.aps.org/rss/recent/physics.xml", label: "APS · Physics" },
+];
+
 function FeedFilterRulesSection() {
   const queryClient = useQueryClient();
   const { data: rules, isLoading } = useQuery({
@@ -154,9 +169,9 @@ export function HomeFeedSection() {
     setPrevSaved(saved);
   }
 
-  function handleBlur() {
+  function saveFeedUrl(raw: string) {
     setError("");
-    const next = input.trim();
+    const next = raw.trim();
     if (next === saved) {
       setInput(next);
       return;
@@ -180,6 +195,16 @@ export function HomeFeedSection() {
         }
       });
   }
+
+  function handlePresetChange(url: string) {
+    setInput(url);
+    saveFeedUrl(url);
+  }
+
+  const trimmedInput = input.trim();
+  const selectedPreset = HOME_FEED_PRESETS.some((feed) => feed.value === trimmedInput)
+    ? trimmedInput
+    : "";
 
   const savedRetention =
     typeof settings?.rss_cache_retention_days === "number"
@@ -228,7 +253,7 @@ export function HomeFeedSection() {
       <SettingGroup>
         <SettingRow
           label="Home feed URL"
-          description="RSS/Atom feed shown on the home page, e.g. https://rss.arxiv.org/rss/cs.LG. Leave empty for the default dashboard"
+          description="Choose a common feed or enter any RSS/Atom feed URL. Leave empty for the default dashboard"
           descriptionId="home-feed-url-desc"
         >
           {settingsLoading ? (
@@ -239,6 +264,14 @@ export function HomeFeedSection() {
             <span className="text-xs text-danger">Could not load settings.</span>
           ) : (
             <div className="flex flex-col gap-2">
+              <OptionSelect
+                aria-label="Common home feed"
+                options={HOME_FEED_PRESETS}
+                value={selectedPreset}
+                onChange={handlePresetChange}
+                placeholder="Choose a common feed…"
+                className="w-80"
+              />
               <Input
                 type="url"
                 value={input}
@@ -246,7 +279,7 @@ export function HomeFeedSection() {
                   setInput(e.target.value);
                   setError("");
                 }}
-                onBlur={handleBlur}
+                onBlur={() => saveFeedUrl(input)}
                 placeholder="https://rss.arxiv.org/rss/cs.LG"
                 aria-label="Home feed URL"
                 aria-describedby={error ? "home-feed-url-desc home-feed-url-error" : "home-feed-url-desc"}
