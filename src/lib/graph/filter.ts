@@ -64,6 +64,31 @@ export interface GraphMatch {
   drawnCount: number;
 }
 
+/** The matched ids for one graph node type. */
+export function matchedFor(m: GraphMatch, type: GraphNodeType): ReadonlySet<string> {
+  return type === "paper" ? m.papers : type === "author" ? m.authors : m.tags;
+}
+
+/** Whether two layout-membership sets name the same nodes. */
+export function sameIds(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
+  if (a.size !== b.size) return false;
+  for (const id of a) if (!b.has(id)) return false;
+  return true;
+}
+
+/** Papers a degree line counts as "shown": matched and of a drawn type. */
+export function drawnPapers(m: GraphMatch): Set<string> {
+  return m.hiddenTypes.has("paper") ? new Set() : new Set(m.papers);
+}
+
+/** Whether one node remains in the fitted/drawn collection. Normal filter
+ * exclusions stay drawn as ghosts; isolate removes non-matches entirely. */
+export function isNodeDrawn(m: GraphMatch, type: GraphNodeType, id: string): boolean {
+  if (m.hiddenTypes.has(type)) return false;
+  if (!m.isolate) return true;
+  return matchedFor(m, type).has(id);
+}
+
 /**
  * The node ids the force layout runs over — the one source charge, collision
  * radius, link set and drag release must agree on (excluded nodes are PINNED,

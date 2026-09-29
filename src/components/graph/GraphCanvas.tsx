@@ -8,7 +8,7 @@ import { isTauri } from "../../api/client";
 import type { ThemeColors } from "../../lib/theme";
 import type { GraphIndex, GraphNodeType, GraphView } from "../../lib/graph/model";
 import type { GraphMatch } from "../../lib/graph/filter";
-import { layoutIds } from "../../lib/graph/filter";
+import { drawnPapers, isNodeDrawn, layoutIds, matchedFor, sameIds } from "../../lib/graph/filter";
 import { f32Collide, f32ManyBody } from "../../lib/graph/f32forces";
 import type { ForceSettings } from "../../lib/graph/layout";
 import { layoutRng, randomizePositions, seedPositions } from "../../lib/graph/layout";
@@ -209,8 +209,6 @@ const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(function Gra
       }
     }
 
-    const matchedFor = (type: GraphNodeType) =>
-      type === "paper" ? m.papers : type === "author" ? m.authors : m.tags;
     const selectedFor = (type: GraphNodeType, id: string) =>
       type === "paper" ? selected.has(id) : type === "author" ? selAuthors.has(id) : selTags.has(id);
 
@@ -220,7 +218,7 @@ const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(function Gra
         const id = n.id();
         const opacity = m.hiddenTypes.has(type)
           ? 0
-          : opacityFor(matchedFor(type).has(id), selectedFor(type, id), anySelected, m.isolate);
+          : opacityFor(matchedFor(m, type).has(id), selectedFor(type, id), anySelected, m.isolate);
         const style: Record<string, unknown> = { opacity, events: eventsFor(opacity) };
         if (type === "paper") {
           // Painted on EVERY selected paper, including one the filter excluded:
@@ -243,7 +241,7 @@ const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(function Gra
           e.style({ opacity: 0, events: "no" });
           return;
         }
-        const visible = matchedFor(srcType).has(sid) && matchedFor(tgtType).has(tid);
+        const visible = matchedFor(m, srcType).has(sid) && matchedFor(m, tgtType).has(tid);
         const sel = selectedFor(srcType, sid) || selectedFor(tgtType, tid);
         const opacity = opacityFor(visible, sel, anySelected, m.isolate);
         e.style({ opacity, events: eventsFor(opacity) });
@@ -720,30 +718,13 @@ const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(function Gra
 
 export default GraphCanvas;
 
-/** Whether two layout-membership sets name the same nodes. */
-function sameIds(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
-  if (a.size !== b.size) return false;
-  for (const id of a) if (!b.has(id)) return false;
-  return true;
-}
-
-/** Papers a degree line counts as "shown": matched and of a drawn type. */
-function drawnPapers(m: GraphMatch): Set<string> {
-  return m.hiddenTypes.has("paper") ? new Set() : new Set(m.papers);
-}
-
 /** The nodes a fit should frame: the ones left at a non-zero opacity. `null`
  *  means "nothing is being held back, frame the whole graph". */
 function drawnCollection(cy: Core, m: GraphMatch) {
-  const isolating = m.isolate;
-  if (m.hiddenTypes.size === 0 && !isolating) return null;
-  const matchedFor = (type: GraphNodeType) =>
-    type === "paper" ? m.papers : type === "author" ? m.authors : m.tags;
+  if (m.hiddenTypes.size === 0 && !m.isolate) return null;
   const drawn = cy.nodes().filter((n) => {
     const type = n.data("type") as GraphNodeType;
-    if (m.hiddenTypes.has(type)) return false;
-    if (!isolating) return true;
-    return matchedFor(type).has(n.id());
+    return isNodeDrawn(m, type, n.id());
   });
   // Isolate with a filter matching nothing draws an empty canvas; there is no
   // extent to frame, so fall back to the whole graph rather than a degenerate box.
